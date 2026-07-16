@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5d547">
+  <title>알파방</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;background:#f7f6f2;color:#242424;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif}
+    button,input{font:inherit}.page{min-height:100vh;display:grid;place-items:center;padding:22px}.card{width:min(440px,100%);padding:27px 23px;border:1px solid #ebe8de;border-radius:24px;background:#fff;box-shadow:0 16px 50px rgba(43,37,17,.09)}
+    .mark{display:grid;place-items:center;width:52px;height:52px;margin-bottom:18px;border-radius:17px;background:#f5d547;font-size:25px;font-weight:900}.eyebrow{margin:0 0 5px;color:#8c7621;font-size:12px;font-weight:800;letter-spacing:.12em}h1{margin:0 0 8px;font-size:29px;letter-spacing:-.05em}.sub{margin:0 0 23px;color:#777;line-height:1.55}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;margin-bottom:18px;padding:4px;border-radius:13px;background:#f2f1ed}.tab{padding:10px;border:0;border-radius:10px;background:transparent;color:#777;font-weight:750;cursor:pointer}.tab.active{background:#fff;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    label{display:block;margin:13px 0 6px;font-size:12px;font-weight:800}.input{width:100%;padding:13px 14px;border:1px solid #deddd8;border-radius:12px;outline:none}.input:focus{border-color:#c1a91f;box-shadow:0 0 0 3px rgba(245,213,71,.28)}.primary{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:#f5d547;color:#1f1f1f;font-weight:850;cursor:pointer}.primary:disabled{opacity:.55}.message{display:none;margin-top:14px;padding:11px 12px;border-radius:11px;background:#f4f3ef;color:#555;font-size:13px;line-height:1.5}.message.show{display:block}.message.error{background:#fff0f0;color:#a43b3b}
+    .member{display:none}.status{padding:18px;border-radius:16px;background:#fff9d9}.status h2{margin:0 0 8px;font-size:20px}.status p{margin:0;color:#615a3a;line-height:1.55}.logout{margin-top:15px;border:0;background:none;color:#777;text-decoration:underline;cursor:pointer}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <div class="mark">A</div>
+      <p class="eyebrow">ALPHA ROOM</p>
+      <h1>알파방</h1>
+      <p class="sub">회원 전용 홈페이지입니다. 가입 후 따구의 승인을 기다려주세요.</p>
+
+      <div id="authView">
+        <div class="tabs"><button id="loginTab" class="tab active">로그인</button><button id="signupTab" class="tab">회원가입</button></div>
+        <form id="authForm">
+          <div id="nicknameRow" style="display:none"><label for="nickname">카카오톡 닉네임</label><input id="nickname" class="input" maxlength="20" autocomplete="nickname" placeholder="단톡방에서 쓰는 이름"></div>
+          <label for="email">이메일</label><input id="email" class="input" type="email" autocomplete="email" required placeholder="example@email.com">
+          <label for="password">비밀번호</label><input id="password" class="input" type="password" minlength="6" autocomplete="current-password" required placeholder="6자 이상">
+          <button id="submitButton" class="primary" type="submit">로그인</button>
+        </form>
+        <div id="message" class="message"></div>
+      </div>
+
+      <div id="memberView" class="member">
+        <div class="status"><h2 id="statusTitle">회원 정보를 확인하고 있어요</h2><p id="statusText">잠시만 기다려주세요.</p></div>
+        <button id="logoutButton" class="logout">로그아웃</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    var SUPABASE_URL="https://jukschbmoegrqvwntjsb.supabase.co";
+    var SUPABASE_KEY="sb_publishable_yACp4MTy2Sm7C5m54eHXCw_t64Dlowt";
+    var client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    var mode="login";
+    var authView=document.getElementById("authView");
+    var memberView=document.getElementById("memberView");
+    var message=document.getElementById("message");
+
+    function showMessage(text,isError){message.textContent=text;message.className="message show"+(isError?" error":"");}
+    function clearMessage(){message.className="message";message.textContent="";}
+    function setMode(next){mode=next;clearMessage();document.getElementById("loginTab").className="tab"+(mode==="login"?" active":"");document.getElementById("signupTab").className="tab"+(mode==="signup"?" active":"");document.getElementById("nicknameRow").style.display=mode==="signup"?"block":"none";document.getElementById("submitButton").textContent=mode==="signup"?"회원가입":"로그인";document.getElementById("password").autocomplete=mode==="signup"?"new-password":"current-password";}
+    async function showSession(session){
+      if(!session){authView.style.display="block";memberView.style.display="none";return;}
+      authView.style.display="none";memberView.style.display="block";
+      var result=await client.from("profiles").select("nickname,role,status").eq("id",session.user.id).single();
+      if(result.error){document.getElementById("statusTitle").textContent="회원 정보 확인 실패";document.getElementById("statusText").textContent="데이터베이스 설정을 먼저 완료해주세요.";return;}
+      var profile=result.data;
+      if(profile.status==="approved"){document.getElementById("statusTitle").textContent=(profile.nickname||"회원")+"님, 환영합니다";document.getElementById("statusText").textContent=profile.role==="admin"?"따구 관리자 계정으로 승인되었습니다.":"알파방 회원으로 승인되었습니다. 다음 단계에서 공지와 익명게시판을 연결합니다.";}
+      else if(profile.status==="blocked"){document.getElementById("statusTitle").textContent="이용이 제한된 계정입니다";document.getElementById("statusText").textContent="관리자에게 문의해주세요.";}
+      else{document.getElementById("statusTitle").textContent="승인 대기 중입니다";document.getElementById("statusText").textContent="회원가입이 완료되었습니다. 따구가 확인 후 승인하면 홈페이지를 이용할 수 있습니다.";}
+    }
+    document.getElementById("loginTab").onclick=function(){setMode("login");};
+    document.getElementById("signupTab").onclick=function(){setMode("signup");};
+    document.getElementById("authForm").onsubmit=async function(event){
+      event.preventDefault();clearMessage();var button=document.getElementById("submitButton");button.disabled=true;
+      var email=document.getElementById("email").value.trim();var password=document.getElementById("password").value;
+      if(mode==="signup"){
+        var nickname=document.getElementById("nickname").value.trim();
+        if(!nickname){showMessage("카카오톡 닉네임을 입력해주세요.",true);button.disabled=false;return;}
+        var signupResult=await client.auth.signUp({email:email,password:password,options:{data:{nickname:nickname}}});
+        if(signupResult.error)showMessage(signupResult.error.message,true);else if(signupResult.data.session)showSession(signupResult.data.session);else showMessage("가입되었습니다. 이메일 인증 후 로그인해주세요.",false);
+      }else{
+        var loginResult=await client.auth.signInWithPassword({email:email,password:password});
+        if(loginResult.error)showMessage("이메일 또는 비밀번호를 확인해주세요.",true);else showSession(loginResult.data.session);
+      }
+      button.disabled=false;
+    };
+    document.getElementById("logoutButton").onclick=async function(){await client.auth.signOut();showSession(null);};
+    client.auth.getSession().then(function(result){showSession(result.data.session);});
+    client.auth.onAuthStateChange(function(event,session){if(event==="SIGNED_OUT")showSession(null);});
+  </script>
+</body>
+</html>
